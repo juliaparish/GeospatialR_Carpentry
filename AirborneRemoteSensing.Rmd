@@ -1,0 +1,357 @@
+---
+title: "geospatialR_airborneRS"
+author: "Julia Parish"
+date: "4/7/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(here)
+library(tidyverse)
+library(raster)
+library(rgdal)
+```
+
+```{r}
+GDALinfo("data/NEON-DS-Airborne-Remote-Sensing/HARV/DSM/HARV_dsmCrop.tif")
+```
+
+```{r}
+# open first raster file
+HARV_dsmCrop_info <- capture.output(
+  GDALinfo(here("data/NEON-DS-Airborne-Remote-Sensing/HARV/DSM/HARV_dsmCrop.tif")))
+```
+# raster are continous dataset with values of 0 - 255, vectors are noncontinous and represented by points, lines, etc. 
+
+```{r}
+DSM_HARV <- 
+  raster("data/NEON-DS-Airborne-Remote-Sensing/HARV/DSM/HARV_dsmCrop.tif")
+
+DSM_HARV
+
+summary(DSM_HARV)
+summary(DSM_HARV, maxsamp = ncell(DSM_HARV))
+```
+
+```{r}
+# create dataframe from raster, createing tidy dataframe with x.y coordinate system
+DSM_HARV_df <- as.data.frame(DSM_HARV, xy = TRUE)
+```
+
+```{r}
+str(DSM_HARV_df)
+```
+
+We can use ggplot() to plot this data. We will set the color scale to scale_fill_viridis_c which is a color-blindness friendly color scale. We will also use the coord_quickmap() function to use an approximate Mercator projection for our plots. This approximation is suitable for small areas that are not too close to the poles. 
+
+```{r}
+#fill is based on column that when we ran structure showed column we wanted to base map values on
+
+ggplot() +
+    geom_raster(data = DSM_HARV_df , aes(x = x, y = y, fill = HARV_dsmCrop)) +
+    scale_fill_viridis_c() +
+    coord_quickmap()
+```
+
+```{r}
+#quick plot
+
+plot(DSM_HARV)
+```
+
+```{r}
+crs(DSM_HARV)
+```
+
+```{r}
+minValue(DSM_HARV)
+maxValue(DSM_HARV)
+
+# the minimum and maximum values haven’t already been calculated, we can calculate them using the setMinMax() function. DSM_HARV is a raster object & this sets the metadata as these min max values are not originally not baked in
+DSM_HARV <- setMinMax(DSM_HARV)
+```
+
+```{r}
+# Raster bands - single raster band
+nlayers(DSM_HARV)
+```
+
+```{r}
+# find distribution of data values, this allows you to check if values are within the correct range
+# message: `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+
+ggplot() +
+  geom_histogram(data = DSM_HARV_df, aes(HARV_dsmCrop), bins = 40)
+
+```
+
+```{r}
+
+DSM_HILL <- 
+  raster("data/NEON-DS-Airborne-Remote-Sensing/HARV/DSM/HARV_DSMhill.tif")
+
+GDALinfo("data/NEON-DS-Airborne-Remote-Sensing/HARV/DSM/HARV_DSMhill.tif")
+
+# Does this file have the same CRS as DSM_HARV?
+crs(DSM_HILL)
+
+# What is the NoDataValue? - 9999
+
+# What is resolution of the raster data? 1 x 1
+res(DSM_HILL)
+
+# How large would a 5x5 pixel area be on the Earth’s surface? 5m x 5m
+
+# Is the file a multi- or single-band raster? SINGLE
+nlayers(DSM_HILL)
+```
+# Plotting Rasters
+
+```{r}
+
+DSM_HARV_df <- DSM_HARV_df %>% 
+  mutate(fct_elevation = cut(HARV_dsmCrop, breaks = 3))
+
+summary(DSM_HARV_df)
+```
+
+```{r}
+ggplot() +
+  geom_bar(data = DSM_HARV_df, aes(fct_elevation))
+```
+
+```{r}
+# find unique values in dataframe
+unique(DSM_HARV_df$fct_elevation)
+
+#get the count of values in each group using dplyr’s group_by() and count() functions:
+DSM_HARV_df %>% 
+  group_by(fct_elevation) %>% 
+  count()
+
+```
+
+```{r}
+#custom bins
+custom_bins <- c(300, 350, 400, 450)
+
+```
+
+We might prefer to customize the cutoff values for these groups. Lets round the cutoff values so that we have groups for the ranges of 301–350 m, 351–400 m, and 401–450 m. To implement this we will give mutate() a numeric vector of break points instead of the number of breaks we want.
+```{r}
+DSM_HARV_df <- DSM_HARV_df %>% 
+  mutate(fct_elevation_2 = cut(HARV_dsmCrop, breaks = custom_bins))
+
+unique(DSM_HARV_df$fct_elevation_2)
+```
+
+```{r}
+ggplot() +
+  geom_bar(data = DSM_HARV_df, aes(fct_elevation_2))
+```
+
+```{r}
+ggplot() +
+  geom_raster(data = DSM_HARV_df, aes(x = x, y = y, fill = fct_elevation_2)) +
+  scale_fill_manual(values = terrain.colors(3)) +
+  coord_quickmap()
+```
+
+If we need to create multiple plots using the same color palette, we can create an R object (my_col) for the set of colors that we want to use. We can then quickly change the palette across all plots by modifying the my_col object, rather than each individual plot.
+
+We can label the x- and y-axes of our plot too using xlab and ylab. We can also give the legend a more meaningful title by passing a value to the name argument of the scale_fill_manual() function.
+
+```{r}
+my_colors <- terrain.colors(3)
+
+ggplot() +
+ geom_raster(data = DSM_HARV_df , aes(x = x, y = y,
+                                      fill = fct_elevation_2)) + 
+    scale_fill_manual(values = my_colors, name = "Elevation") + 
+    coord_quickmap()
+
+```
+
+Or we can also turn off the labels of both axes by passing element_blank() to the relevant part of the theme() function.
+```{r}
+ggplot() +
+ geom_raster(data = DSM_HARV_df , aes(x = x, y = y,
+                                      fill = fct_elevation_2)) + 
+    scale_fill_manual(values = my_colors, name = "Elevation") +
+    theme(axis.title = element_blank()) + 
+    coord_quickmap()
+```
+
+# Layering Rasters
+
+```{r}
+DSM_hill_HARV <- raster("data/NEON-DS-Airborne-Remote-Sensing/HARV/DSM/HARV_DSMhill.tif")
+```
+
+```{r}
+# convert to dataframe
+DSM_hill_HARV_df <- as.data.frame(DSM_hill_HARV, xy = TRUE) 
+
+str(DSM_hill_HARV_df)
+```
+
+```{r}
+# guide "none" means no legend
+ggplot() +
+  geom_raster(data = DSM_hill_HARV_df,
+              aes(x = x, y = y, alpha = HARV_DSMhill)) + 
+  scale_alpha(range =  c(0.15, 0.65), guide = "none") + 
+  coord_quickmap() # tells ggplot to do a rough plot of crs to scale accurately, but not exact
+```
+
+
+```{r}
+ggplot() +
+  geom_raster(data = DSM_HARV_df , 
+              aes(x = x, y = y, fill = HARV_dsmCrop)) + 
+  geom_raster(data = DSM_hill_HARV_df,
+              aes(x = x, y = y, alpha = HARV_DSMhill)) +
+  scale_fill_viridis_c() +
+  scale_alpha(range = c(0.15, 0.65), guide = "none") +  
+  ggtitle("Elevation with hillshade") +
+  coord_quickmap()
+```
+
+```{r}
+# digital terrain model = DTM
+DTM_HARV <- raster("data/NEON-DS-Airborne-Remote-Sensing/HARV/DTM/HARV_dtmCrop.tif")
+
+DTM_hill_HARV <- raster("data/NEON-DS-Airborne-Remote-Sensing/HARV/DTM/HARV_DTMhill_WGS84.tif")
+```
+
+
+```{r}
+#convert to dataframe 
+DTM_HARV_df <- as.data.frame(DTM_HARV, xy = TRUE)
+
+DTM_hill_HARV_df <- as.data.frame(DTM_hill_HARV, xy = TRUE)
+```
+
+
+```{r}
+# crs
+ggplot() +
+     geom_raster(data = DTM_HARV_df , 
+                 aes(x = x, y = y, 
+                  fill = HARV_dtmCrop)) + 
+     geom_raster(data = DTM_hill_HARV_df, 
+                 aes(x = x, y = y, 
+                   alpha = HARV_DTMhill_WGS84)) +
+     scale_fill_gradientn(name = "Elevation", colors = terrain.colors(10)) + 
+     coord_quickmap()
+```
+
+```{r}
+crs(DTM_HARV)
+
+```
+
+```{r}
+crs(DTM_hill_HARV)
+```
+
+```{r}
+# can't check crs this way
+#crs(DTM_HARV) == crs(DTM_hill_HARV)
+
+# rasters HAVE to be the same CRS or they won't overlay or layer
+compareCRS(DTM_HARV, DTM_hill_HARV)
+```
+
+```{r}
+#reproject hillshade onto DTM_HARV, matching crs
+# select raster you want to reproject, then add crs you want to assign
+DTM_hill_reprojected <- projectRaster(DTM_hill_HARV, crs = crs(DTM_HARV))
+
+```
+
+```{r}
+DTM_hill_reprojected_df <- as.data.frame(DTM_hill_reprojected, xy=TRUE)
+```
+
+```{r}
+ggplot() +
+     geom_raster(data = DTM_HARV_df , 
+                 aes(x = x, y = y, 
+                  fill = HARV_dtmCrop)) + 
+     geom_raster(data = DTM_hill_reprojected_df, 
+                 aes(x = x, y = y, 
+                   alpha = HARV_DTMhill_WGS84)) +
+     scale_fill_gradientn(name = "Elevation", colors = terrain.colors(10)) + 
+     coord_quickmap()
+```
+
+# Raster Calculations
+
+Let's build a canopy height
+
+We can perform raster calculations by subtracting (or adding, multiplying, etc) two rasters. In the geospatial world, we call this “raster math”.
+
+Let’s subtract the DTM from the DSM to create a Canopy Height Model. After subtracting, let’s create a dataframe so we can plot with ggplot.
+
+```{r}
+ggplot() +
+      geom_raster(data = DTM_HARV_df , 
+              aes(x = x, y = y, fill = HARV_dtmCrop)) +
+     scale_fill_gradientn(name = "Elevation", colors = terrain.colors(10)) + 
+     coord_quickmap()
+```
+
+
+```{r}
+ggplot() +
+      geom_raster(data = DSM_HARV_df , 
+              aes(x = x, y = y, fill = HARV_dsmCrop)) +
+     scale_fill_gradientn(name = "Elevation", colors = terrain.colors(10)) + 
+     coord_quickmap()
+```
+
+
+```{r}
+RGB_band1_HARV <- raster("data/NEON-DS-Airborne-Remote-Sensing/HARV/RGB_Imagery/HARV_RGB_Ortho.tif")
+
+nbands(RGB_band1_HARV)
+
+RGB_band1_HARV_df <- as.data.frame(RGB_band1_HARV, xy = TRUE, band = 1)
+```
+
+```{r}
+ggplot() + 
+  geom_raster(data = RGB_band1_HARV_df,
+              aes(x = x , y = y, alpha = HARV_RGB_Ortho)) +
+                coord_quickmap()
+
+```
+
+# a new function for color, raster band
+
+```{r}
+RGB_stack_HARV <- stack("data/NEON-DS-Airborne-Remote-Sensing/HARV/RGB_Imagery/HARV_RGB_Ortho.tif")
+
+RGB_stack_HARV
+
+RGB_stack_HARV@layers
+
+RGB_stack_HARV[[2]]
+```
+
+```{r}
+RGB_stack_HARV_df <- as.data.frame(RGB_stack_HARV, xy = TRUE)
+
+str(RGB_stack_HARV_df)
+```
+
+```{r}
+plotRGB(RGB_stack_HARV,
+        r = 1, g = 2, b = 3)
+```
+
