@@ -1,0 +1,510 @@
+---
+title: "IntroToGeospatialRasterandVectorDataWithR"
+author: "Julia Parish"
+date: "2022/04/08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(here)
+library(tidyverse)
+library(sf)
+```
+
+# Open and Plot Shapefiles
+
+```{r}
+aoi_boundary_HARV <- st_read(here("data/NEON-DS-Site-Layout-Files/HARV/HarClip_UTMZ18.shp"))
+
+aoi_boundary_HARV
+```
+
+## Spatial Metadata
+Key metadata for all shapefiles include:
+
+Object Type: the class of the imported object.
+Coordinate Reference System (CRS): the projection of the data.
+Extent: the spatial extent (i.e. geographic area that the shapefile covers) of the shapefile. Note that the spatial extent for a shapefile represents the combined extent for all spatial objects in the shapefile.
+We can view shapefile metadata using the st_geometry_type(), st_crs() and st_bbox() functions. 
+
+```{r}
+# view shapefile metadata 
+st_geometry_type(aoi_boundary_HARV)
+
+# check what CRS this file data is in
+st_crs(aoi_boundary_HARV)
+
+# gives min max of x,y = bounding box
+st_bbox(aoi_boundary_HARV)
+```
+
+### Plot a Shapefile
+```{r}
+ggplot() + 
+  geom_sf(data = aoi_boundary_HARV, size = 3, color = "black", fill = "cyan1") + 
+  ggtitle("AOI Boundary Plot") + 
+  coord_sf()
+```
+
+```{r}
+lines_HARV <- st_read(here("data/NEON-DS-Site-Layout-Files/HARV/HARV_roads.shp"))
+
+point_HARV <- st_read(here("data/NEON-DS-Site-Layout-Files/HARV/HARVtower_UTM18N.shp"))
+```
+
+```{r}
+# multiline string
+lines_HARV
+
+# point data
+point_HARV 
+```
+#### Answer the following questions:
+
+- What type of R spatial object is created when you import each layer?
+
+- What is the CRS and extent for each object?
+
+- Do the files contain points, lines, or polygons?
+
+- How many spatial objects are in each file?
+
+```{r}
+class(lines_HARV)
+class(point_HARV)
+
+st_geometry_type(lines_HARV)
+st_geometry_type(point_HARV )
+
+st_crs(lines_HARV)
+st_crs(point_HARV)
+
+st_bbox(lines_HARV)
+st_bbox(point_HARV)
+```
+
+### Summary
+- Shapefile metadata include geometry type, CRS, and extent.
+- Load spatial objects into R with the st_read() function.
+- Spatial objects can be plotted directly with ggplot using the geom_sf() function. No need to convert to a dataframe.
+
+
+# Explore and Plot by Vector Layer Attributes
+
+How to identify and query layer attributes, as well as how to subset features by specific attribute values. Learn how to plot a feature according to a set of attribute values.
+
+## Query Vector Feature Metadata
+
+As we discussed in the Open and Plot Shapefiles in R episode, we can view metadata associated with an R object using:
+
+- st_geometry_type() - The type of vector data stored in the object.
+- nrow() - The number of features in the object
+- st_bbox() - The spatial extent (geographic area covered by) of the object.
+- st_crs() - The CRS (spatial projection) of the data.
+
+
+```{r}
+#15 fields, each row corresponds to a line
+lines_HARV
+```
+```{r}
+ncol(lines_HARV)
+```
+
+```{r}
+names(lines_HARV)
+
+head(lines_HARV)
+```
+
+```{r}
+point_HARV
+
+ncol(point_HARV)
+
+point_HARV$Ownership
+
+names(point_HARV)
+```
+
+```{r}
+ncol(aoi_boundary_HARV)
+```
+
+## Explore Values within One Attribute
+We can explore individual values stored within a particular attribute. Comparing attributes to a spreadsheet or a data frame, this is similar to exploring values in a column. We did this with the gapminder dataframe in an earlier lesson. For spatial objects, we can use the same syntax: objectName$attributeName.
+
+We can see the contents of the TYPE field of our lines feature:
+
+```{r}
+lines_HARV$TYPE
+```
+
+```{r}
+unique(lines_HARV$TYPE)
+```
+
+```{r}
+footpath_HARV <- lines_HARV %>% 
+  filter(TYPE == "footpath")
+
+nrow(footpath_HARV)
+```
+
+```{r}
+ggplot() + 
+  geom_sf(data = footpath_HARV) +
+  ggtitle("NEON Harvard Forest Field Site", subtitle = "Footpaths") + 
+  coord_sf()
+```
+
+There are two features in our footpaths subset. Why does the plot look like there is only one feature? Let’s adjust the colors used in our plot. If we have 2 features in our vector object, we can plot each using a unique color by assigning a column name to the color aesthetic (color =). We use the syntax aes(color = ) to do this. We can also alter the default line thickness by using the size = parameter, as the default value of 0.5 can be hard to see. Note that size is placed outside of the aes() function, as we are not connecting line thickness to a data variable.
+
+
+```{r}
+# note: color = factor(OBJECTID)
+unique(footpath_HARV$OBJECTID)
+
+ggplot() + 
+  geom_sf(data = footpath_HARV, aes(color = factor(OBJECTID)), size = 1.5) +
+  labs(color = 'Footpath ID') +
+  ggtitle("NEON Harvard Forest Field Site", subtitle = "Footpaths") + 
+  coord_sf()
+```
+
+Subset out all boardwalk from the lines layer and plot it.
+
+```{r}
+boardwalk_HARV <- lines_HARV %>% 
+  filter(TYPE == "boardwalk")
+
+nrow(boardwalk_HARV)
+
+
+```
+
+```{r}
+
+ggplot() + 
+  geom_sf(data = boardwalk_HARV, size = 1.5) +
+  ggtitle("NEON Harvard Forest Field Site", subtitle = "Boardwalks") + 
+  coord_sf()
+```
+
+
+Subset out all stone wall features from the lines layer and plot it. For each plot, color each feature using a unique color.
+
+```{r}
+stonewall_HARV <- lines_HARV %>% 
+  filter(TYPE == "stone wall")
+
+nrow(stonewall_HARV)
+```
+
+```{r}
+ggplot() + 
+  geom_sf(data = stonewall_HARV, aes(color = factor(OBJECTID)), size = 1.5) +
+  labs(color = 'Wall ID') +
+  ggtitle("NEON Harvard Forest Field Site", subtitle = "Stonewalls") + 
+  coord_sf()
+```
+
+## Customize Plots
+
+In the examples above, ggplot() automatically selected colors for each line based on a default color order. If we don’t like those default colors, we can create a vector of colors - one for each feature. To create this vector we can use the following syntax:
+
+c("color_one", "color_two", "color_three")[object$factor]
+
+Note in the above example we have: 
+- a vector of colors - one for each factor value (unique attribute value)
+- the attribute itself ([object$factor]) of class factor.
+
+First we will check how many unique values our factor has:
+
+```{r}
+unique(lines_HARV$TYPE)
+```
+
+```{r}
+road_colors <- c("slategray4", "darkolivegreen4", "tomato3", "purple4")
+```
+
+```{r}
+# use road_colors to plot data
+
+ggplot() +
+  geom_sf(data = lines_HARV, aes(color = TYPE)) + 
+  scale_color_manual(values = road_colors) +
+  labs(color = 'Road Type') +
+  ggtitle("NEON Harvard Forest Field Site", subtitle = "Roads & Trails") + 
+  coord_sf()
+```
+
+## Adjust Line Width
+
+We adjusted line width universally earlier. If we want a unique line width for each factor level or attribute category in our spatial object, we can use the same syntax that we used for colors, above. We already know that we have four different TYPE values in the lines_HARV object, so we will set four different line widths.
+
+```{r}
+# set line width
+line_widths <- c(1, 2, 3, 4)
+```
+
+```{r}
+ggplot() +
+  geom_sf(data = lines_HARV, aes(color = TYPE, size = TYPE)) + 
+  scale_color_manual(values = road_colors) +
+  labs(color = 'Road Type') +
+  scale_size_manual(values = line_widths) +
+  ggtitle("NEON Harvard Forest Field Site", subtitle = "Roads & Trails - Line width varies") + 
+  coord_sf()
+```
+
+# Plot Multiple Shapefiles
+
+In the previous episode, we learned how to plot information from a single shapefile and do some plot customization including adding a custom legend. However, what if we want to create a more complex plot with many shapefiles and unique symbols that need to be represented clearly in a legend? Now, let’s create a plot that combines our tower location (point_HARV), site boundary (aoi_boundary_HARV) and roads (lines_HARV) spatial objects. We will need to build a custom legend as well.
+
+To begin, we will create a plot with the site boundary as the first layer. Then layer the tower location and road data on top using +.
+
+```{r}
+# ?pch to view default ggplot shapes
+
+ggplot() + 
+  geom_sf(data = aoi_boundary_HARV, fill = "grey", color = "grey") +
+  geom_sf(data = lines_HARV, aes(color = TYPE), size = 1) + # road types
+  geom_sf(data = point_HARV, aes(fill = Sub_Type), shape = 9) + # tower point
+  ggtitle("NEON Harvard Forest Field Site") + 
+  scale_color_manual(values = road_colors, name = "Line Type") +
+  scale_fill_manual(values = "black", name = "Tower Location") +
+  coord_sf()
+```
+
+#### Challenge: Plot Polygon by Attribute
+Using the NEON-DS-Site-Layout-Files/HARV/PlotLocations_HARV.shp shapefile, create a map of study plot locations, with each point colored by the soil type (soilTypeOr). How many different soil types are there at this particular field site? Overlay this layer on top of the lines_HARV layer (the roads). Create a custom legend that applies line symbols to lines and point symbols to the points.
+
+Modify the plot above. Tell R to plot each point, using a different symbol of shape value.
+
+```{r}
+plots_HARV <- st_read(here("data/NEON-DS-Site-Layout-Files/HARV/PlotLocations_HARV.shp"))
+```
+
+```{r}
+names(plots_HARV)
+nrow(plots_HARV)
+ncol(plots_HARV)
+
+head(plots_HARV)
+
+```
+```{r}
+unique(plots_HARV$soilTypeOr)
+```
+
+```{r}
+soil_color <- c("tan4", "goldenrod2")
+```
+
+```{r}
+ggplot() + 
+  geom_sf(data = lines_HARV, aes(color = TYPE), show.legend = "line") + 
+  geom_sf(data = plots_HARV, aes(fill = soilTypeOr), 
+          shape = 21, show.legend = 'point') + 
+  scale_color_manual(name = "Line Type", values = road_colors,
+     guide = guide_legend(override.aes = list(linetype = "solid", shape = NA))) + 
+  scale_fill_manual(name = "Soil Type", values = soil_color,
+     guide = guide_legend(override.aes = list(linetype = "blank", shape = 21, colour = NA))) + 
+  ggtitle("NEON Harvard Forest Field Site") + 
+  coord_sf()
+```
+
+# Handling Spatial Projection & CRS 
+
+In an earlier episode we learned how to handle a situation where you have two different files with raster data in different projections. Now we will apply those same principles to working with vector data. We will create a base map of our study site using United States state and country boundary information accessed from the United States Census Bureau. We will learn how to map vector data that are in different CRSs and thus don’t line up on a map.
+
+We will continue to work with the three shapefiles that we loaded in the Open and Plot Shapefiles in R episode.
+
+
+## Working With Spatial Data From Different Sources
+
+We often need to gather spatial datasets from different sources and/or data that cover different spatial extents. These data are often in different Coordinate Reference Systems (CRSs).
+
+Some reasons for data being in different CRSs include:
+
+- The data are stored in a particular CRS convention used by the data provider (for example, a government agency).
+- The data are stored in a particular CRS that is customized to a region. For instance, many states in the US prefer to use a State Plane projection customized for that state.
+
+```{r}
+state_boundary_US <- st_read(here("data/NEON-DS-Site-Layout-Files/US-Boundary-Layers/US-State-Boundaries-Census-2014.shp"))
+
+country_boundary_US <- st_read(here("data/NEON-DS-Site-Layout-Files/US-Boundary-Layers/US-Boundary-Dissolved-States.shp"))
+
+neStatesBoundary_US <- st_read(here("data/NEON-DS-Site-Layout-Files/US-Boundary-Layers/Boundary-US-State-NEast.shp"))
+```
+```{r}
+# plot the U.S. states data
+ggplot() +
+  geom_sf(data = state_boundary_US) +
+  ggtitle("Map of Contiguous US State Boundaries") +
+  coord_sf()
+```
+
+```{r}
+st_crs(point_HARV)
+st_crs(state_boundary_US)
+
+st_bbox(point_HARV)
+st_bbox(state_boundary_US)
+```
+
+```{r}
+ggplot() +
+  geom_sf(data = state_boundary_US, color = "lightcyan4") +
+  geom_sf(data = point_HARV, shape = 19, color = "slateblue2", size = 3) +
+  ggtitle("Map of Contiguous US State Boundaries") +
+  coord_sf()
+```
+
+#### Create a map of the North Eastern United States as follows:
+
+- Import and plot Boundary-US-State-NEast.shp. Adjust line width as necessary.
+- Layer the Fisher Tower (in the NEON Harvard Forest site) point location point_HARV onto the plot.
+- Add a title.
+- Add a legend that shows both the state boundary (as a line) and the Tower location point.
+
+```{r}
+ggplot() +
+  geom_sf(data = neStatesBoundary_US, aes(color = "color"), show.legend = "line") +
+  scale_color_manual(name = " ", labels = "State Boundary", values = c("color" = "paleturquoise4")) +
+  geom_sf(data = point_HARV, aes(shape = "shape"), color = "slateblue2") +
+  scale_shape_manual(name = " ", labels = "Fisher Tower", values = c("shape" = 19)) +
+  ggtitle("HARV Fisher Tower Location") +
+  coord_sf() +
+  theme_minimal()
+```
+
+# Convert from .csv to a Shapefile
+
+This episode will review how to import spatial points stored in .csv (Comma Separated Value) format into R as an sf spatial object. We will also reproject data imported from a shapefile format, export this data as a shapefile, and plot raster and vector data as layers in the same plot.
+
+## Spatial Data in Text Format
+
+The HARV_PlotLocations.csv file contains x, y (point) locations for study plot where NEON collects data on vegetation and other ecological metrics. We would like to:
+
+- Create a map of these plot locations.
+- Export the data in a shapefile format to share with our colleagues. This shapefile can be imported into any GIS software.
+- Create a map showing vegetation height with plot locations layered on top.
+
+Spatial data are sometimes stored in a text file format (.txt or .csv). If the text file has an associated x and y location column, then we can convert it into an sf spatial object. The sf object allows us to store both the x,y values that represent the coordinate location of each point and the associated attribute data - or columns describing each feature in the spatial object.
+
+### Import .csv
+
+```{r}
+# import csv
+
+plot_locations_HARV <-
+  read.csv(here("data/NEON-DS-Site-Layout-Files/HARV/HARV_PlotLocations.csv"))
+
+str(plot_locations_HARV)
+```
+
+We now have a data frame that contains 21 locations (rows) and 16 variables (attributes). Note that all of our character data was imported into R as factor (categorical) data. Next, let’s explore the dataframe to determine whether it contains columns with coordinate values. If we are lucky, our .csv will contain columns labeled:
+
+- “X” and “Y” OR
+- Latitude and Longitude OR
+- easting and northing (UTM coordinates)
+
+```{r}
+#  check out the column names of our dataframe.
+
+names(plot_locations_HARV)
+```
+
+### Identify X,Y Location Columns
+Our column names include several fields that might contain spatial information. The `plot_locations_HARV$easting` and `plot_locations_HARV$northing` columns contain coordinate values. We can confirm this by looking at the first six rows of our data.
+
+```{r}
+head(plot_locations_HARV$easting)
+
+head(plot_locations_HARV$northing)
+```
+
+We have coordinate values in our data frame. In order to convert our data frame to an sf object, we also need to know the CRS associated with those coordinate values.
+
+There are several ways to figure out the CRS of spatial data in text format.
+
+- We can check the file metadata in hopes that the CRS was recorded in the data.
+- We can explore the file itself to see if CRS information is embedded in the file header or somewhere in the data columns.
+
+Following the `easting` and `northing` columns, there is a `geodeticDa` and a `utmZone` column. These appear to contain CRS information (datum and projection).
+
+```{r}
+head(plot_locations_HARV$geodeticDa)
+head(plot_locations_HARV$utmZone)
+```
+
+It is not typical to store CRS information in a column. But this particular file contains CRS information this way. The geodeticDa and utmZone columns contain the information that helps us determine the CRS:
+
+- geodeticDa: WGS84 – this is geodetic datum WGS84
+- utmZone: 18
+
+In When Vector Data Don’t Line Up - Handling Spatial Projection & CRS in R we learned about the components of a proj4 string. We have everything we need to assign a CRS to our data frame.
+
+To create the proj4 associated with UTM Zone 18 WGS84 we can look up the projection on the Spatial Reference website, which contains a list of CRS formats for each projection. From here, we can extract the proj4 string for UTM Zone 18N WGS84.
+
+However, if we have other data in the UTM Zone 18N projection, it’s much easier to use the st_crs() function to extract the CRS in proj4 format from that object and assign it to our new spatial object. We’ve seen this CRS before with our Harvard Forest study site (point_HARV).
+
+```{r}
+st_crs(point_HARV)
+```
+
+```{r}
+utm18nCRS <- st_crs(point_HARV)
+utm18nCRS
+```
+```{r}
+# check to make sure it is a crs class
+class(utm18nCRS)
+```
+
+### .csv to sf object
+
+Convert our dataframe into an sf object. To do this, we need to specify:
+
+- The columns containing X (easting) and Y (northing) coordinate values
+- The CRS that the column coordinate represent (units are included in the CRS) - stored in our utmCRS object.
+
+We will use the st_as_sf() function to perform the conversion.
+
+```{r}
+# convert csv to an sf object
+# add data file, establish cols w/ coords, specify CRS
+
+plot_locations_sp_HARV <- st_as_sf(plot_locations_HARV, coords = c("easting", "northing"), crs = utm18nCRS)
+
+```
+
+```{r}
+# check crs
+st_crs(plot_locations_sp_HARV)
+```
+
+### Plot Spatial Object
+
+```{r}
+# plot 
+
+ggplot() +
+  geom_sf(data = plot_locations_sp_HARV) +
+  geom_sf(data = point_HARV, color = "mediumseagreen")+
+  ggtitle("Map of Plot Locations") +
+  theme_minimal()
+```
+### save file to ESRI Shapefile
+
+```{r}
+st_write(plot_locations_sp_HARV, "data/PlotLocations_HARV.shp", driver = "ESRI Shapefile")
+```
+

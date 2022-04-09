@@ -38,3 +38,4 @@ ggplot () +
   labs(color = 'Condition') +
   coord_sf()
 
+
